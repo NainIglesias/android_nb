@@ -17,8 +17,8 @@ android {
         applicationId = "io.github.nainiglesias.nb"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "0.1.1"
 
         ndk {
             // Phones. Add "x86_64" here to run on an emulator.
