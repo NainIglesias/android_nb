@@ -153,8 +153,12 @@ class NotebookTest {
 
         val different = rerun(listOf(out("""{"output_type": "stream", "name": "stdout", "text": "a\n"}""")))
         assertTrue(!Changes.same(different, saved))
+        // Different outputs aren't an edit.
+        assertTrue(Changes.sameSources(different, saved))
         val edited = saved.copy(cells = saved.cells.toMutableList().also { it[1] = code.copy(source = "1 + 1") })
         assertTrue(!Changes.same(edited, saved))
+        assertTrue(!Changes.sameSources(edited, saved))
+        assertTrue(!Changes.sameSources(saved.copy(cells = saved.cells.reversed()), saved))
 
         // Tracebacks name the cell by its execution count.
         fun error(n: Int) = out("""{"output_type": "error", "ename": "E", "evalue": "", "traceback": ["File <cell [$n]>, line 1"]}""")

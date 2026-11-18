@@ -202,7 +202,7 @@ private fun NotebookTopBar(
         title = {
             Column {
                 Text(
-                    (if (doc.dirty) "• " else "") + doc.name,
+                    (if (doc.edited) "• " else "") + doc.name,
                     maxLines = 1, overflow = TextOverflow.Ellipsis,
                     style = MaterialTheme.typography.titleMedium,
                 )

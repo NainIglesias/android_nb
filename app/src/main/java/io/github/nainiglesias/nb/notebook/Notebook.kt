@@ -233,6 +233,22 @@ object Changes {
         return a.cells.indices.all { sameCell(a.cells[it], b.cells[it]) }
     }
 
+    /**
+     * Whether [a] and [b] differ only in outputs. Running cells on the phone never reproduces
+     * outputs saved elsewhere byte for byte (other library versions, other image rendering), so
+     * only this kind of change, an edit, is worth asking about before closing.
+     */
+    fun sameSources(a: Notebook, b: Notebook): Boolean {
+        if (a === b) return true
+        if (a.metadata != b.metadata || a.extra != b.extra || a.cells.size != b.cells.size) return false
+        return a.cells.indices.all { i ->
+            val x = a.cells[i]
+            val y = b.cells[i]
+            x === y || (x.id == y.id && x.type == y.type && x.source == y.source &&
+                x.metadata == y.metadata && x.extra == y.extra)
+        }
+    }
+
     private fun sameCell(a: Cell, b: Cell): Boolean {
         if (a === b) return true
         if (a.id != b.id || a.type != b.type || a.source != b.source) return false

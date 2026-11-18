@@ -13,7 +13,7 @@ An Android app that opens Jupyter notebooks (`.ipynb`), runs them **on the phone
 - Run a cell, run all cells, run from a given cell, interrupt, and restart. Cells run one at a time and share variables, like in Jupyter. "Run all" stops at the first error.
 - `input()` opens a dialog. Matplotlib figures appear after `plt.show()` or at the end of a cell. `IPython.display` works (`display`, `HTML`, `Markdown`, `Image`, `clear_output`). `%%writefile` works, and other magics are skipped with a warning.
 - Edit cells: insert, delete, move, and switch between code and text. The code editor has auto-indent and a symbol bar (Tab, brackets, quotes, …) above the keyboard.
-- Running cells only counts as a change if the results differ: re-running with the same output (only new `[n]` counts) doesn't ask you to save.
+- Closing asks to save only if you edited cells (code, text, adding, deleting or moving). Running doesn't: outputs made on the phone never match ones saved by Jupyter on a PC byte for byte (other library versions, other image rendering), and running again makes them again. If the outputs changed, the Save button stays available to keep them.
 - Save back to the same file, or save a copy. Files are written in Jupyter's own format (1-space indent, sorted keys), so diffs stay clean.
 - "Add data files" copies CSVs and other files into the folder the notebook runs in, so `pd.read_csv("data.csv")` works.
 

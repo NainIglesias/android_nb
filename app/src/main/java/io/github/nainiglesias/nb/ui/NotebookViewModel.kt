@@ -43,7 +43,10 @@ data class OpenDoc(
     val notebook: Notebook,
     /** The notebook as it is in the file (or as it was created), to tell whether there are changes. */
     val saved: Notebook = notebook,
+    /** Anything differs from [saved], outputs included: offer to save. */
     val dirty: Boolean = false,
+    /** Cells were edited (not just run): ask before closing. */
+    val edited: Boolean = false,
     /** Folder cells run in: the notebook's own folder for project files, else the shared workspace. */
     val workdir: File? = null,
 )
@@ -114,9 +117,12 @@ class NotebookViewModel(app: Application) : AndroidViewModel(app) {
 
     // ---------------------------------------------------------------- files
 
-    /** Run [action] now, or after the user saves or discards unsaved changes. */
+    /**
+     * Run [action] now, or after the user saves or discards unsaved edits. New outputs alone
+     * don't ask: they can be made again by running the notebook.
+     */
     fun guardUnsaved(action: () -> Unit) {
-        if (doc?.dirty == true) pendingDiscard = action else action()
+        if (doc?.edited == true) pendingDiscard = action else action()
     }
 
     fun resolveDiscard(save: Boolean?) {
@@ -246,10 +252,7 @@ class NotebookViewModel(app: Application) : AndroidViewModel(app) {
     private fun markSaved(saved: OpenDoc, uri: Uri, name: String) {
         val current = doc ?: return
         // Edits made while writing keep the document dirty.
-        doc = current.copy(
-            uri = uri, name = name, saved = saved.notebook,
-            dirty = !Changes.same(current.notebook, saved.notebook),
-        )
+        doc = current.copy(uri = uri, name = name, saved = saved.notebook).withChanges(current.notebook)
         message("Saved $name")
     }
 
@@ -320,8 +323,12 @@ class NotebookViewModel(app: Application) : AndroidViewModel(app) {
         val d = doc ?: return
         val cells = f(d.notebook.cells)
         if (cells === d.notebook.cells) return
-        val notebook = d.notebook.copy(cells = cells)
-        doc = d.copy(notebook = notebook, dirty = !Changes.same(notebook, d.saved))
+        doc = d.withChanges(d.notebook.copy(cells = cells))
+    }
+
+    private fun OpenDoc.withChanges(notebook: Notebook): OpenDoc {
+        val edited = !Changes.sameSources(notebook, saved)
+        return copy(notebook = notebook, edited = edited, dirty = edited || !Changes.same(notebook, saved))
     }
 
     private fun updateCell(id: String, f: (Cell) -> Cell) = edit { cells ->
