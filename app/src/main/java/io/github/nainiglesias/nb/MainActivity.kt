@@ -4,6 +4,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import java.io.File
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -16,11 +17,10 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import io.github.nainiglesias.nb.ui.FileKind
 import io.github.nainiglesias.nb.ui.HomeScreen
+import io.github.nainiglesias.nb.ui.ProjectDrawer
 import io.github.nainiglesias.nb.ui.MarkdownScreen
 import io.github.nainiglesias.nb.ui.ProjectScreen
 import io.github.nainiglesias.nb.ui.ProjectsViewModel
@@ -52,7 +52,6 @@ class MainActivity : ComponentActivity() {
                 val addToProjectLauncher = rememberLauncherForActivityResult(
                     ActivityResultContracts.OpenMultipleDocuments()
                 ) { uris -> pvm.importFiles(uris) }
-                var askMarkdownDiscard by remember { mutableStateOf(false) }
 
                 LaunchedEffect(Unit) { vm.messages.collect { snackbar.showSnackbar(it) } }
                 LaunchedEffect(Unit) { pvm.messages.collect { snackbar.showSnackbar(it) } }
@@ -62,18 +61,42 @@ class MainActivity : ComponentActivity() {
                 val doc = vm.doc
                 val markdown = pvm.markdown
                 val project = pvm.current
+                // A project file open: the side panel lists the project's files to jump between them.
+                val projectFile: File? = when {
+                    project == null -> null
+                    doc != null -> doc.uri?.takeIf { doc.workdir != null && it.scheme == "file" }?.path?.let(::File)
+                    else -> markdown?.file
+                }
+                val openFromPanel: (File, FileKind) -> Unit = { file, kind ->
+                    when {
+                        vm.doc != null && kind == FileKind.NOTEBOOK -> vm.openFile(file)
+                        vm.doc != null -> vm.closeThen { pvm.openMarkdown(file) }
+                        kind == FileKind.NOTEBOOK -> pvm.leaveMarkdownThen { vm.openFile(file) }
+                        else -> pvm.leaveMarkdownThen { pvm.openMarkdown(file) }
+                    }
+                }
+                val showProject: () -> Unit = {
+                    if (vm.doc != null) vm.close() else pvm.leaveMarkdownThen()
+                }
                 when {
                     doc != null -> {
                         BackHandler {
                             if (vm.editingId != null) vm.editingId = null else vm.close()
                         }
-                        NotebookScreen(vm, doc, snackbar, onImportFiles = { importLauncher.launch(arrayOf("*/*")) })
-                    }
-                    markdown != null -> {
-                        BackHandler {
-                            if (markdown.dirty) askMarkdownDiscard = true else pvm.closeMarkdown()
+                        val importFiles = { importLauncher.launch(arrayOf("*/*")) }
+                        if (project != null && projectFile != null) {
+                            ProjectDrawer(pvm, project, projectFile, openFromPanel, showProject) { openPanel ->
+                                NotebookScreen(vm, doc, snackbar, onImportFiles = importFiles, onShowFiles = openPanel)
+                            }
+                        } else {
+                            NotebookScreen(vm, doc, snackbar, onImportFiles = importFiles)
                         }
-                        MarkdownScreen(pvm, markdown, snackbar, askMarkdownDiscard) { askMarkdownDiscard = it }
+                    }
+                    markdown != null && project != null -> {
+                        BackHandler { pvm.leaveMarkdownThen() }
+                        ProjectDrawer(pvm, project, markdown.file, openFromPanel, showProject) { openPanel ->
+                            MarkdownScreen(pvm, markdown, snackbar, onShowFiles = openPanel)
+                        }
                     }
                     project != null -> {
                         BackHandler { if (!pvm.up()) pvm.closeProject() }

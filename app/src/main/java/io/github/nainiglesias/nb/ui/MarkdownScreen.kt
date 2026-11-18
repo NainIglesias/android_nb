@@ -2,6 +2,7 @@ package io.github.nainiglesias.nb.ui
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
@@ -13,6 +14,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -41,15 +43,17 @@ fun MarkdownScreen(
     pvm: ProjectsViewModel,
     doc: MarkdownDoc,
     snackbar: SnackbarHostState,
-    askDiscard: Boolean,
-    onAskDiscardChange: (Boolean) -> Unit,
+    onShowFiles: () -> Unit,
 ) {
     Scaffold(
         topBar = {
             TopAppBar(
                 navigationIcon = {
-                    IconButton(onClick = { if (doc.dirty) onAskDiscardChange(true) else pvm.closeMarkdown() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Close")
+                    Row {
+                        IconButton(onClick = { pvm.leaveMarkdownThen() }) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, "Close")
+                        }
+                        IconButton(onClick = onShowFiles) { Icon(Icons.Default.Menu, "Project files") }
                     }
                 },
                 title = {
@@ -95,21 +99,13 @@ fun MarkdownScreen(
         }
     }
 
-    if (askDiscard) {
+    if (pvm.pendingLeave != null) {
         AlertDialog(
-            onDismissRequest = { onAskDiscardChange(false) },
+            onDismissRequest = { pvm.resolveLeave(null) },
             title = { Text("Save changes?") },
             text = { Text("${doc.file.name} has unsaved changes.") },
-            confirmButton = {
-                TextButton(onClick = {
-                    onAskDiscardChange(false)
-                    pvm.saveMarkdown()
-                    pvm.closeMarkdown()
-                }) { Text("Save") }
-            },
-            dismissButton = {
-                TextButton(onClick = { onAskDiscardChange(false); pvm.closeMarkdown() }) { Text("Discard") }
-            },
+            confirmButton = { TextButton(onClick = { pvm.resolveLeave(true) }) { Text("Save") } },
+            dismissButton = { TextButton(onClick = { pvm.resolveLeave(false) }) { Text("Discard") } },
         )
     }
 }

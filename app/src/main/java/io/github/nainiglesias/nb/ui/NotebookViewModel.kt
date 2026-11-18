@@ -17,6 +17,7 @@ import io.github.nainiglesias.nb.kernel.ExecResult
 import io.github.nainiglesias.nb.kernel.ExecutionListener
 import io.github.nainiglesias.nb.notebook.Cell
 import io.github.nainiglesias.nb.notebook.CellType
+import io.github.nainiglesias.nb.notebook.Changes
 import io.github.nainiglesias.nb.notebook.Notebook
 import io.github.nainiglesias.nb.notebook.NotebookFormatException
 import io.github.nainiglesias.nb.notebook.NotebookIO
@@ -40,6 +41,8 @@ data class OpenDoc(
     val uri: Uri?,
     val name: String,
     val notebook: Notebook,
+    /** The notebook as it is in the file (or as it was created), to tell whether there are changes. */
+    val saved: Notebook = notebook,
     val dirty: Boolean = false,
     /** Folder cells run in: the notebook's own folder for project files, else the shared workspace. */
     val workdir: File? = null,
@@ -131,6 +134,12 @@ class NotebookViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun close() = guardUnsaved { switchTo(null) }
+
+    /** Close the notebook (asking first if it has unsaved changes), then run [action]. */
+    fun closeThen(action: () -> Unit) = guardUnsaved {
+        switchTo(null)
+        action()
+    }
 
     fun open(uri: Uri) = guardUnsaved { load(uri) }
 
@@ -237,7 +246,10 @@ class NotebookViewModel(app: Application) : AndroidViewModel(app) {
     private fun markSaved(saved: OpenDoc, uri: Uri, name: String) {
         val current = doc ?: return
         // Edits made while writing keep the document dirty.
-        doc = current.copy(uri = uri, name = name, dirty = current.notebook != saved.notebook)
+        doc = current.copy(
+            uri = uri, name = name, saved = saved.notebook,
+            dirty = !Changes.same(current.notebook, saved.notebook),
+        )
         message("Saved $name")
     }
 
@@ -304,11 +316,12 @@ class NotebookViewModel(app: Application) : AndroidViewModel(app) {
 
     // ---------------------------------------------------------------- editing
 
-    private fun edit(markDirty: Boolean = true, f: (List<Cell>) -> List<Cell>) {
+    private fun edit(f: (List<Cell>) -> List<Cell>) {
         val d = doc ?: return
         val cells = f(d.notebook.cells)
         if (cells === d.notebook.cells) return
-        doc = d.copy(notebook = d.notebook.copy(cells = cells), dirty = d.dirty || markDirty)
+        val notebook = d.notebook.copy(cells = cells)
+        doc = d.copy(notebook = notebook, dirty = !Changes.same(notebook, d.saved))
     }
 
     private fun updateCell(id: String, f: (Cell) -> Cell) = edit { cells ->

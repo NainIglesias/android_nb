@@ -7,11 +7,13 @@ An Android app that opens Jupyter notebooks (`.ipynb`), runs them **on the phone
 - **Projects.** On first launch the app asks you to create a project or bring one from GitHub. A project is a folder (in the app's private storage) with notebooks, Markdown notes, data files and subfolders. Notebooks in a project run inside their own folder, so `pd.read_csv("data/x.csv")` works with the repo's layout.
 - **From GitHub, with Pull.** Paste `owner/repo` or a github.com link (`/tree/<branch>` picks a branch). The app downloads the files, and **Pull** later fetches only what changed. Your local edits are kept. If a file changed both on the phone and on GitHub, the phone's version stays and GitHub's is saved next to it as `name (GitHub).ext`. "Reset to GitHub" throws local changes away. Private repos need a token (a fine-grained token with read access to Contents). There is no push: it uses GitHub's REST API, not git.
 - Markdown files (`.md`) are rendered, and can be edited and saved.
+- Inside a project file, the ☰ button next to the back arrow shows the project's files in a side panel, with folders you can expand and collapse, so you can jump to another notebook or note.
 - Open notebooks with the system file picker (local storage, Google Drive, …), with "Open with" or "Share" from other apps, or from the recent files list.
 - Rendered Markdown cells, syntax-highlighted code, and Jupyter outputs: text, colored tracebacks, images, HTML tables (pandas), Markdown and JSON.
 - Run a cell, run all cells, run from a given cell, interrupt, and restart. Cells run one at a time and share variables, like in Jupyter. "Run all" stops at the first error.
 - `input()` opens a dialog. Matplotlib figures appear after `plt.show()` or at the end of a cell. `IPython.display` works (`display`, `HTML`, `Markdown`, `Image`, `clear_output`). `%%writefile` works, and other magics are skipped with a warning.
 - Edit cells: insert, delete, move, and switch between code and text. The code editor has auto-indent and a symbol bar (Tab, brackets, quotes, …) above the keyboard.
+- Running cells only counts as a change if the results differ: re-running with the same output (only new `[n]` counts) doesn't ask you to save.
 - Save back to the same file, or save a copy. Files are written in Jupyter's own format (1-space indent, sorted keys), so diffs stay clean.
 - "Add data files" copies CSVs and other files into the folder the notebook runs in, so `pd.read_csv("data.csv")` works.
 

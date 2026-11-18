@@ -133,4 +133,31 @@ class NotebookTest {
         bar = Outputs.append(bar, stream("100%\n"))
         assertEquals("100%\n", bar[0]["text"]!!.jsonPrimitive.content)
     }
+
+    @Test
+    fun rerunWithSameOutputIsNotAChange() {
+        val saved = NotebookIO.parse(sample)
+        val code = saved.cells[1]
+        fun rerun(outputs: List<JsonObject>) =
+            saved.copy(cells = saved.cells.toMutableList().also { it[1] = code.copy(outputs = outputs, executionCount = 1) })
+        fun out(json: String) = Json.parseToJsonElement(json).jsonObject
+
+        // Same text, image with a line break removed, metadata dropped, new execution count.
+        val same = rerun(
+            listOf(
+                out("""{"output_type": "stream", "name": "stdout", "text": "a\nb\n"}"""),
+                out("""{"output_type": "display_data", "data": {"image/png": "iV\nBOR", "text/plain": "<Figure>"}, "metadata": {"x": 1}}"""),
+            )
+        )
+        assertTrue(Changes.same(same, saved))
+
+        val different = rerun(listOf(out("""{"output_type": "stream", "name": "stdout", "text": "a\n"}""")))
+        assertTrue(!Changes.same(different, saved))
+        val edited = saved.copy(cells = saved.cells.toMutableList().also { it[1] = code.copy(source = "1 + 1") })
+        assertTrue(!Changes.same(edited, saved))
+
+        // Tracebacks name the cell by its execution count.
+        fun error(n: Int) = out("""{"output_type": "error", "ename": "E", "evalue": "", "traceback": ["File <cell [$n]>, line 1"]}""")
+        assertTrue(Changes.same(rerun(listOf(error(3))), rerun(listOf(error(7)))))
+    }
 }

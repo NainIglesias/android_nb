@@ -31,6 +31,9 @@ data class MarkdownDoc(val file: File, val saved: String, val text: String, val 
     val dirty get() = text != saved
 }
 
+/** One visible line of the side panel's file tree. [path] is relative to the project root. */
+data class TreeRow(val path: String, val name: String, val depth: Int, val kind: FileKind, val file: File)
+
 /** Progress of a clone or pull. */
 data class SyncProgress(val label: String, val done: Int = 0, val total: Int = 0)
 
@@ -51,6 +54,14 @@ class ProjectsViewModel(app: Application) : AndroidViewModel(app) {
     var sync by mutableStateOf<SyncProgress?>(null)
         private set
     var markdown by mutableStateOf<MarkdownDoc?>(null)
+        private set
+
+    /** Folders open in the side panel's tree, relative to the project root. */
+    var expanded by mutableStateOf<Set<String>>(emptySet())
+        private set
+
+    /** Something to do once the open Markdown file is saved or discarded (asked in a dialog). */
+    var pendingLeave by mutableStateOf<(() -> Unit)?>(null)
         private set
 
     val githubToken: String? get() = store.githubToken
@@ -109,6 +120,7 @@ class ProjectsViewModel(app: Application) : AndroidViewModel(app) {
     fun openProject(project: Project) {
         current = project
         folder = ""
+        expanded = emptySet()
         refresh()
     }
 
@@ -152,8 +164,11 @@ class ProjectsViewModel(app: Application) : AndroidViewModel(app) {
     // ---------------------------------------------------------------- files
 
     fun refresh() {
-        val dir = folderDir ?: return
-        entries = (dir.listFiles() ?: emptyArray())
+        entries = folderDir?.let(::list) ?: emptyList()
+    }
+
+    private fun list(dir: File): List<Entry> =
+        (dir.listFiles() ?: emptyArray())
             .filter { !it.name.startsWith(".") }
             .map { f ->
                 val kind = when {
@@ -166,7 +181,6 @@ class ProjectsViewModel(app: Application) : AndroidViewModel(app) {
                 Entry(f.name, f, kind, if (f.isFile) f.length() else 0)
             }
             .sortedWith(compareBy<Entry> { it.kind != FileKind.FOLDER }.thenBy { it.name.lowercase() })
-    }
 
     fun enterFolder(name: String) {
         folder = if (folder.isEmpty()) name else "$folder/$name"
@@ -249,7 +263,57 @@ class ProjectsViewModel(app: Application) : AndroidViewModel(app) {
         return uri.lastPathSegment?.substringAfterLast('/') ?: "file"
     }
 
+    // ---------------------------------------------------------------- side panel
+
+    fun toggleExpanded(path: String) {
+        expanded = if (path in expanded) expanded - path else expanded + path
+    }
+
+    /** Open the folders above [file] so it shows in the tree. */
+    fun reveal(file: File) {
+        val root = current?.let(::dir) ?: return
+        val rel = file.relativeToOrNull(root)?.invariantSeparatorsPath ?: return
+        val parts = rel.split('/').dropLast(1)
+        if (parts.isEmpty() || rel.startsWith("..")) return
+        expanded = expanded + parts.indices.map { parts.take(it + 1).joinToString("/") }
+    }
+
+    /** The project's files as a flat list, descending into the expanded folders. */
+    fun treeRows(): List<TreeRow> {
+        val root = current?.let(::dir) ?: return emptyList()
+        val rows = mutableListOf<TreeRow>()
+        fun walk(dir: File, prefix: String, depth: Int) {
+            for (e in list(dir)) {
+                val path = if (prefix.isEmpty()) e.name else "$prefix/${e.name}"
+                rows += TreeRow(path, e.name, depth, e.kind, e.file)
+                if (e.kind == FileKind.FOLDER && path in expanded) walk(e.file, path, depth + 1)
+            }
+        }
+        walk(root, "", 0)
+        return rows
+    }
+
     // ---------------------------------------------------------------- markdown
+
+    /** Close the Markdown file, asking first if it has unsaved changes, then run [action]. */
+    fun leaveMarkdownThen(action: () -> Unit = {}) {
+        if (markdown?.dirty == true) {
+            pendingLeave = action
+        } else {
+            closeMarkdown()
+            action()
+        }
+    }
+
+    /** Answer to the unsaved-changes dialog: save, discard, or null to stay. */
+    fun resolveLeave(save: Boolean?) {
+        val action = pendingLeave ?: return
+        pendingLeave = null
+        if (save == null) return
+        if (save) saveMarkdown()
+        closeMarkdown()
+        action()
+    }
 
     fun openMarkdown(file: File, editing: Boolean = false) {
         viewModelScope.launch {

@@ -221,6 +221,48 @@ object NotebookIO {
     }
 }
 
+/**
+ * Whether two notebooks show the same thing. Execution counts and output metadata are ignored,
+ * and so is the cell number in traceback file names, so running a notebook again with the same
+ * results doesn't count as a change.
+ */
+object Changes {
+    fun same(a: Notebook, b: Notebook): Boolean {
+        if (a === b) return true
+        if (a.metadata != b.metadata || a.extra != b.extra || a.cells.size != b.cells.size) return false
+        return a.cells.indices.all { sameCell(a.cells[it], b.cells[it]) }
+    }
+
+    private fun sameCell(a: Cell, b: Cell): Boolean {
+        if (a === b) return true
+        if (a.id != b.id || a.type != b.type || a.source != b.source) return false
+        if (a.metadata != b.metadata || a.extra != b.extra || a.outputs.size != b.outputs.size) return false
+        return a.outputs.indices.all { sameOutput(a.outputs[it], b.outputs[it]) }
+    }
+
+    private fun sameOutput(a: JsonObject, b: JsonObject) = a === b || comparable(a) == comparable(b)
+
+    private val IGNORED = setOf("execution_count", "metadata")
+    private val CELL_NAME = Regex("""<cell \[\d+\]>""")
+    private val SPACE = Regex("""\s+""")
+
+    private fun comparable(o: JsonObject): Map<String, JsonElement> = o.filterKeys { it !in IGNORED }.mapValues { (k, v) ->
+        when {
+            k == "traceback" && v is JsonArray -> JsonArray(v.map { line ->
+                (line as? JsonPrimitive)?.contentOrNull?.let { JsonPrimitive(it.replace(CELL_NAME, "<cell>")) } ?: line
+            })
+            k == "data" && v is JsonObject -> JsonObject(v.mapValues { (mime, d) ->
+                // Base64 images may be saved with line breaks.
+                val text = (d as? JsonPrimitive)?.takeIf { it.isString }?.content
+                if (text != null && mime.startsWith("image/") && mime != "image/svg+xml") {
+                    JsonPrimitive(text.replace(SPACE, ""))
+                } else d
+            })
+            else -> v
+        }
+    }
+}
+
 /** Pure operations on a cell's outputs, used while a cell runs. */
 object Outputs {
     /**

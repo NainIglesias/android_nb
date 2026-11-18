@@ -51,6 +51,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.nainiglesias.nb.data.Project
@@ -252,7 +253,7 @@ private fun Breadcrumbs(root: String, folder: String, onGo: (String) -> Unit) {
 }
 
 @Composable
-private fun KindBadge(kind: FileKind, name: String) {
+internal fun KindBadge(kind: FileKind, name: String, size: Dp = 40.dp) {
     val (label, color) = when (kind) {
         FileKind.FOLDER -> "DIR" to MaterialTheme.colorScheme.secondary
         FileKind.NOTEBOOK -> "NB" to Color(0xFFF37726) // Jupyter orange
@@ -263,8 +264,8 @@ private fun KindBadge(kind: FileKind, name: String) {
     Box(
         contentAlignment = Alignment.Center,
         modifier = Modifier
-            .size(40.dp)
-            .clip(RoundedCornerShape(8.dp))
+            .size(size)
+            .clip(RoundedCornerShape(size / 5))
             .background(color.copy(alpha = 0.16f)),
     ) {
         Text(
@@ -272,7 +273,7 @@ private fun KindBadge(kind: FileKind, name: String) {
             color = color,
             fontFamily = FontFamily.Monospace,
             fontWeight = FontWeight.Bold,
-            fontSize = 11.sp,
+            fontSize = if (size < 40.dp) 9.sp else 11.sp,
             textAlign = TextAlign.Center,
         )
     }

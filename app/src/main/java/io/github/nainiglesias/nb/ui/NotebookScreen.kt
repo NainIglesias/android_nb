@@ -28,6 +28,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.AlertDialog
@@ -95,6 +96,7 @@ fun NotebookScreen(
     doc: OpenDoc,
     snackbar: SnackbarHostState,
     onImportFiles: () -> Unit,
+    onShowFiles: (() -> Unit)? = null,
 ) {
     val cells = doc.notebook.cells
     val editingId = vm.editingId
@@ -115,7 +117,7 @@ fun NotebookScreen(
     }
 
     Scaffold(
-        topBar = { NotebookTopBar(vm, doc, onImportFiles, onShowWorkspace = { showWorkspace = true }) },
+        topBar = { NotebookTopBar(vm, doc, onImportFiles, onShowWorkspace = { showWorkspace = true }, onShowFiles) },
         snackbarHost = { androidx.compose.material3.SnackbarHost(snackbar) },
         bottomBar = {
             if (editingCell != null) {
@@ -187,11 +189,15 @@ private fun NotebookTopBar(
     doc: OpenDoc,
     onImportFiles: () -> Unit,
     onShowWorkspace: () -> Unit,
+    onShowFiles: (() -> Unit)?,
 ) {
     var menu by remember { mutableStateOf(false) }
     TopAppBar(
         navigationIcon = {
-            IconButton(onClick = vm::close) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Close notebook") }
+            Row {
+                IconButton(onClick = vm::close) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Close notebook") }
+                if (onShowFiles != null) IconButton(onClick = onShowFiles) { Icon(Icons.Default.Menu, "Project files") }
+            }
         },
         title = {
             Column {
