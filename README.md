@@ -1,6 +1,6 @@
 # Notebooks for Android
 
-An Android app that opens Jupyter notebooks (`.ipynb`), runs them **on the phone**, and lets you edit and save them. No server or browser is needed: Python 3.13 is embedded in the app with [Chaquopy](https://chaquo.com/chaquopy/), and numpy, pandas and matplotlib are bundled.
+An Android app that opens Jupyter notebooks (`.ipynb`), runs them **on the phone**, and lets you edit and save them. No server or browser is needed: Python 3.10 is embedded in the app with [Chaquopy](https://chaquo.com/chaquopy/), and numpy, pandas, matplotlib, scipy and scikit-learn are bundled.
 
 ## Features
 
@@ -24,7 +24,7 @@ An Android app that opens Jupyter notebooks (`.ipynb`), runs them **on the phone
 
 ## Build
 
-Requirements: JDK 21 and Python 3.13 (both pinned in `mise.toml`, so run `mise install`), plus the Android SDK with `platforms;android-37.0`. Point to the SDK with `ANDROID_HOME` or `local.properties` (`sdk.dir=/home/you/Android/Sdk`).
+Requirements: JDK 21 and Python 3.10 (both pinned in `mise.toml`, so run `mise install`), plus the Android SDK with `platforms;android-37.0`. Point to the SDK with `ANDROID_HOME` or `local.properties` (`sdk.dir=/home/you/Android/Sdk`).
 
 ```sh
 ./gradlew assembleDebug                       # APK in app/build/outputs/apk/debug/
@@ -32,7 +32,11 @@ Requirements: JDK 21 and Python 3.13 (both pinned in `mise.toml`, so run `mise i
 python -m unittest discover -s python-tests   # kernel tests on host Python (matplotlib tests need matplotlib installed)
 ```
 
-## Adding Python packages
+## Python version and packages
+
+The app uses **Python 3.10** because that is the newest version with Android builds of scikit-learn and scipy in [Chaquopy's repository](https://chaquo.com/pypi-13.1/). The bundled versions are numpy 1.23, pandas 2.1, matplotlib 3.6, scipy 1.8 and scikit-learn 1.3. That is why the APK is about 145 MB. Without scikit-learn, Python 3.13 would allow newer numpy and matplotlib and a ~77 MB APK.
+
+### Adding packages
 
 Packages are installed at build time, not at runtime: `!pip install` inside a notebook can't work. Add them to the `chaquopy { pip { … } }` block in `app/build.gradle.kts`. Only pure-Python packages, or packages that have Android wheels in [Chaquopy's repository](https://chaquo.com/pypi-13.1/), will install. Each one makes the APK bigger.
 
@@ -54,4 +58,5 @@ Packages are installed at build time, not at runtime: `!pip install` inside a no
 - An interrupt takes effect at the next Python bytecode. A long call inside numpy, or a `time.sleep`, finishes first.
 - "Restart" clears variables, but modules that were already imported stay loaded.
 - nbformat 3 (pre-2015) notebooks aren't supported.
+- The scipy and scikit-learn builds predate Android's 16 KB memory pages, so they may fail to load on phones that use 16 KB pages (some newer devices).
 - Builds target ARM64 phones. Add `"x86_64"` to `abiFilters` to run the app on an emulator.

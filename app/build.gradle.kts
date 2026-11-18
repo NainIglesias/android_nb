@@ -56,13 +56,20 @@ android {
 
 chaquopy {
     defaultConfig {
-        version = "3.13"
+        // 3.10 is the newest Python that Chaquopy has scikit-learn and scipy builds for.
+        // The build Python (from mise.toml / CI) must be the same minor version.
+        version = "3.10"
         pip {
             // Packages available to notebooks. Only packages with Android wheels
             // (https://chaquo.com/pypi-13.1/) or pure-Python wheels work.
+            // pip resolves numpy 1.23, matplotlib 3.6, scipy 1.8, scikit-learn 1.3.
             install("numpy")
             install("pandas")
             install("matplotlib")
+            install("scikit-learn") // also pulls in scipy
+            // The Android matplotlib builds call pyparsing's camelCase API, which
+            // pyparsing 3.3+ flags with a warning printed in every plotting cell.
+            install("pyparsing<3.3")
         }
     }
 }
