@@ -4,6 +4,9 @@ An Android app that opens Jupyter notebooks (`.ipynb`), runs them **on the phone
 
 ## Features
 
+- **Projects.** On first launch the app asks you to create a project or bring one from GitHub. A project is a folder (in the app's private storage) with notebooks, Markdown notes, data files and subfolders. Notebooks in a project run inside their own folder, so `pd.read_csv("data/x.csv")` works with the repo's layout.
+- **From GitHub, with Pull.** Paste `owner/repo` or a github.com link (`/tree/<branch>` picks a branch). The app downloads the files, and **Pull** later fetches only what changed. Your local edits are kept. If a file changed both on the phone and on GitHub, the phone's version stays and GitHub's is saved next to it as `name (GitHub).ext`. "Reset to GitHub" throws local changes away. Private repos need a token (a fine-grained token with read access to Contents). There is no push: it uses GitHub's REST API, not git.
+- Markdown files (`.md`) are rendered, and can be edited and saved.
 - Open notebooks with the system file picker (local storage, Google Drive, …), with "Open with" or "Share" from other apps, or from the recent files list.
 - Rendered Markdown cells, syntax-highlighted code, and Jupyter outputs: text, colored tracebacks, images, HTML tables (pandas), Markdown and JSON.
 - Run a cell, run all cells, run from a given cell, interrupt, and restart. Cells run one at a time and share variables, like in Jupyter. "Run all" stops at the first error.
@@ -28,7 +31,7 @@ Requirements: JDK 21 and Python 3.10 (both pinned in `mise.toml`, so run `mise i
 
 ```sh
 ./gradlew assembleDebug                       # APK in app/build/outputs/apk/debug/
-./gradlew testDebugUnitTest                   # Kotlin unit tests (notebook format, lexer, ANSI)
+./gradlew testDebugUnitTest                   # Kotlin unit tests (notebook format, lexer, ANSI, GitHub sync)
 python -m unittest discover -s python-tests   # kernel tests on host Python (matplotlib tests need matplotlib installed)
 ```
 
@@ -49,10 +52,13 @@ Packages are installed at build time, not at runtime: `!pip install` inside a no
 | Kotlin ↔ Python bridge (one interpreter, one kernel thread) | `kernel/PythonKernel.kt` |
 | nbformat v4 parsing and writing, output merging | `notebook/Notebook.kt` |
 | State, file I/O, run queue | `ui/NotebookViewModel.kt` |
-| Compose UI | `ui/NotebookScreen.kt`, `ui/OutputViews.kt`, `ui/HomeScreen.kt` |
+| Projects: list, folders, Markdown files | `data/Projects.kt`, `ui/ProjectsViewModel.kt` |
+| GitHub pull: API client, three-way plan (GitHub / last pull / disk), applying it | `sync/GitHub.kt`, `sync/Sync.kt`, `sync/Puller.kt` |
+| Compose UI | `ui/HomeScreen.kt`, `ui/ProjectScreen.kt`, `ui/MarkdownScreen.kt`, `ui/NotebookScreen.kt`, `ui/OutputViews.kt` |
 
 ## Limitations
 
+- GitHub sync is pull-only, and needs a connection. Without a token GitHub allows 60 API requests an hour (a pull uses 2 or 3; file downloads don't count). Repos with more than ~100,000 files, and files over 50 MB, aren't downloaded. Git LFS files arrive as pointer files.
 - Only Python, and only the bundled packages. No other kernels and no remote Jupyter server, yet.
 - No ipywidgets, and HTML outputs run without JavaScript (so plotly and bokeh fall back to their text form). LaTeX in Markdown is shown as source.
 - An interrupt takes effect at the next Python bytecode. A long call inside numpy, or a `time.sleep`, finishes first.

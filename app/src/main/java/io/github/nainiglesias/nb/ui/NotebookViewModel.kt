@@ -41,6 +41,8 @@ data class OpenDoc(
     val name: String,
     val notebook: Notebook,
     val dirty: Boolean = false,
+    /** Folder cells run in: the notebook's own folder for project files, else the shared workspace. */
+    val workdir: File? = null,
 )
 
 sealed interface KernelState {
@@ -132,18 +134,26 @@ class NotebookViewModel(app: Application) : AndroidViewModel(app) {
 
     fun open(uri: Uri) = guardUnsaved { load(uri) }
 
-    private fun load(uri: Uri) {
+    /** Open a notebook inside a project folder. Its cells run in that folder. */
+    fun openFile(file: File) = guardUnsaved { load(Uri.fromFile(file), workdir = file.parentFile) }
+
+    private fun load(uri: Uri, workdir: File? = null) {
         viewModelScope.launch {
             loading = true
             try {
                 val (name, notebook) = withContext(Dispatchers.IO) {
-                    keepPermission(uri)
-                    val text = resolver.openInputStream(uri)?.use { it.readBytes().decodeToString() }
-                        ?: error("The file couldn't be read.")
+                    val text = if (uri.scheme == "file") {
+                        File(uri.path!!).readText()
+                    } else {
+                        keepPermission(uri)
+                        resolver.openInputStream(uri)?.use { it.readBytes().decodeToString() }
+                            ?: error("The file couldn't be read.")
+                    }
                     displayName(uri) to NotebookIO.parse(text)
                 }
-                recent = recentStore.add(uri.toString(), name)
-                switchTo(OpenDoc(uri, name, notebook))
+                // Project files are listed in their project, not in "Recent".
+                if (workdir == null) recent = recentStore.add(uri.toString(), name)
+                switchTo(OpenDoc(uri, name, notebook, workdir = workdir))
             } catch (e: NotebookFormatException) {
                 message(e.message ?: "Not a notebook.")
             } catch (e: Exception) {
@@ -165,12 +175,15 @@ class NotebookViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             runner?.join()
             try {
-                kernel.newSession()
+                kernel.newSession(newDoc?.workdir ?: kernel.workspace)
             } catch (e: Throwable) {
                 kernelState = KernelState.Failed(e.message ?: e.toString())
             }
         }
     }
+
+    /** Folder the current notebook runs in. */
+    val workdir: File get() = doc?.workdir ?: kernel.workspace
 
     /** Save to the current file, or ask where to save if there isn't a writable one. */
     fun save(then: (() -> Unit)? = null) {
@@ -229,6 +242,13 @@ class NotebookViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private fun write(uri: Uri, text: String) {
+        if (uri.scheme == "file") {
+            val file = File(uri.path!!)
+            val tmp = File(file.parentFile, ".${file.name}.saving")
+            tmp.writeText(text)
+            if (!tmp.renameTo(file)) error("couldn't replace ${file.name}")
+            return
+        }
         val out = resolver.openOutputStream(uri, "wt") ?: error("no output stream")
         out.use { it.write(text.encodeToByteArray()) }
     }
@@ -247,6 +267,7 @@ class NotebookViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private fun displayName(uri: Uri): String {
+        if (uri.scheme == "file") return File(uri.path!!).name
         try {
             resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
                 if (c.moveToFirst() && !c.isNull(0)) return c.getString(0)
@@ -265,7 +286,7 @@ class NotebookViewModel(app: Application) : AndroidViewModel(app) {
                     runCatching {
                         val name = displayName(uri).replace('/', '_')
                         resolver.openInputStream(uri)!!.use { input ->
-                            File(kernel.workspace, name).outputStream().use { input.copyTo(it) }
+                            File(workdir, name).outputStream().use { input.copyTo(it) }
                         }
                         name
                     }.getOrNull()
@@ -278,7 +299,8 @@ class NotebookViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun workspaceFiles(): List<String> = kernel.workspace.list()?.sorted() ?: emptyList()
+    fun workspaceFiles(): List<String> =
+        workdir.list()?.filter { !it.startsWith(".") }?.sorted() ?: emptyList()
 
     // ---------------------------------------------------------------- editing
 
@@ -428,7 +450,7 @@ class NotebookViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             runner?.join()
             try {
-                kernel.newSession()
+                kernel.newSession(workdir)
                 message("Restarted Python. Variables were cleared.")
                 if (runAllAfter) runAll()
             } catch (e: Throwable) {

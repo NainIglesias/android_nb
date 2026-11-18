@@ -16,14 +16,21 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import io.github.nainiglesias.nb.ui.HomeScreen
+import io.github.nainiglesias.nb.ui.MarkdownScreen
+import io.github.nainiglesias.nb.ui.ProjectScreen
+import io.github.nainiglesias.nb.ui.ProjectsViewModel
 import io.github.nainiglesias.nb.ui.NotebookScreen
 import io.github.nainiglesias.nb.ui.NotebookViewModel
 import io.github.nainiglesias.nb.ui.theme.NbTheme
 
 class MainActivity : ComponentActivity() {
     private val vm: NotebookViewModel by viewModels()
+    private val pvm: ProjectsViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -42,18 +49,41 @@ class MainActivity : ComponentActivity() {
                 val importLauncher = rememberLauncherForActivityResult(
                     ActivityResultContracts.OpenMultipleDocuments()
                 ) { uris -> vm.importToWorkspace(uris) }
+                val addToProjectLauncher = rememberLauncherForActivityResult(
+                    ActivityResultContracts.OpenMultipleDocuments()
+                ) { uris -> pvm.importFiles(uris) }
+                var askMarkdownDiscard by remember { mutableStateOf(false) }
 
                 LaunchedEffect(Unit) { vm.messages.collect { snackbar.showSnackbar(it) } }
+                LaunchedEffect(Unit) { pvm.messages.collect { snackbar.showSnackbar(it) } }
                 LaunchedEffect(Unit) { vm.saveAsRequests.collect { name -> saveAsLauncher.launch(name) } }
 
+                // Screens stack up: home → project → notebook or Markdown file.
                 val doc = vm.doc
-                if (doc == null) {
-                    HomeScreen(vm, snackbar, onOpen = { openLauncher.launch(arrayOf("*/*")) })
-                } else {
-                    BackHandler {
-                        if (vm.editingId != null) vm.editingId = null else vm.close()
+                val markdown = pvm.markdown
+                val project = pvm.current
+                when {
+                    doc != null -> {
+                        BackHandler {
+                            if (vm.editingId != null) vm.editingId = null else vm.close()
+                        }
+                        NotebookScreen(vm, doc, snackbar, onImportFiles = { importLauncher.launch(arrayOf("*/*")) })
                     }
-                    NotebookScreen(vm, doc, snackbar, onImportFiles = { importLauncher.launch(arrayOf("*/*")) })
+                    markdown != null -> {
+                        BackHandler {
+                            if (markdown.dirty) askMarkdownDiscard = true else pvm.closeMarkdown()
+                        }
+                        MarkdownScreen(pvm, markdown, snackbar, askMarkdownDiscard) { askMarkdownDiscard = it }
+                    }
+                    project != null -> {
+                        BackHandler { if (!pvm.up()) pvm.closeProject() }
+                        ProjectScreen(
+                            pvm, project, snackbar,
+                            onOpenNotebook = vm::openFile,
+                            onAddFiles = { addToProjectLauncher.launch(arrayOf("*/*")) },
+                        )
+                    }
+                    else -> HomeScreen(vm, pvm, snackbar, onOpenFile = { openLauncher.launch(arrayOf("*/*")) })
                 }
 
                 if (vm.pendingDiscard != null) {

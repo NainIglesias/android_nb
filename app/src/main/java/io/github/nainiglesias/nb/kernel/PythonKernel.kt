@@ -49,10 +49,10 @@ class PythonKernel(context: Context) {
         py.getModule("sys").get("version")!!.toString().substringBefore(' ')
     }
 
-    /** Throw away all variables and start counting cells from 1 again. */
-    suspend fun newSession() = withContext(dispatcher) {
+    /** Throw away all variables and start counting cells from 1 again. Cells run in [workdir]. */
+    suspend fun newSession(workdir: File = workspace) = withContext(dispatcher) {
         start()
-        session = module!!.callAttr("new_session", workspace.absolutePath)
+        session = module!!.callAttr("new_session", workdir.absolutePath)
     }
 
     suspend fun execute(code: String, listener: ExecutionListener): ExecResult = withContext(dispatcher) {
