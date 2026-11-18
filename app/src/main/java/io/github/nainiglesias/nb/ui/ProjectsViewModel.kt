@@ -24,6 +24,13 @@ import java.io.File
 
 enum class FileKind { FOLDER, NOTEBOOK, MARKDOWN, OTHER }
 
+fun fileKind(f: File): FileKind = when {
+    f.isDirectory -> FileKind.FOLDER
+    f.name.endsWith(".ipynb", ignoreCase = true) -> FileKind.NOTEBOOK
+    f.name.endsWith(".md", ignoreCase = true) || f.name.endsWith(".markdown", ignoreCase = true) -> FileKind.MARKDOWN
+    else -> FileKind.OTHER
+}
+
 data class Entry(val name: String, val file: File, val kind: FileKind, val size: Long)
 
 /** A Markdown file open for reading or editing. */
@@ -69,7 +76,7 @@ class ProjectsViewModel(app: Application) : AndroidViewModel(app) {
     private val _messages = MutableSharedFlow<String>(extraBufferCapacity = 8)
     val messages: SharedFlow<String> = _messages
 
-    private fun message(text: String) {
+    fun message(text: String) {
         _messages.tryEmit(text)
     }
 
@@ -170,16 +177,7 @@ class ProjectsViewModel(app: Application) : AndroidViewModel(app) {
     private fun list(dir: File): List<Entry> =
         (dir.listFiles() ?: emptyArray())
             .filter { !it.name.startsWith(".") }
-            .map { f ->
-                val kind = when {
-                    f.isDirectory -> FileKind.FOLDER
-                    f.name.endsWith(".ipynb", ignoreCase = true) -> FileKind.NOTEBOOK
-                    f.name.endsWith(".md", ignoreCase = true) || f.name.endsWith(".markdown", ignoreCase = true) ->
-                        FileKind.MARKDOWN
-                    else -> FileKind.OTHER
-                }
-                Entry(f.name, f, kind, if (f.isFile) f.length() else 0)
-            }
+            .map { f -> Entry(f.name, f, fileKind(f), if (f.isFile) f.length() else 0) }
             .sortedWith(compareBy<Entry> { it.kind != FileKind.FOLDER }.thenBy { it.name.lowercase() })
 
     fun enterFolder(name: String) {
