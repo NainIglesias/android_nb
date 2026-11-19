@@ -79,7 +79,6 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.mikepenz.markdown.m3.Markdown
 import io.github.nainiglesias.nb.notebook.Cell
 import io.github.nainiglesias.nb.notebook.CellType
 import io.github.nainiglesias.nb.notebook.Editing
@@ -327,7 +326,7 @@ private fun CellCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 } else {
-                    Markdown(cell.source, modifier = Modifier.fillMaxWidth())
+                    MarkdownText(cell.source)
                 }
             }
         }

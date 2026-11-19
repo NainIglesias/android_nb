@@ -6,7 +6,7 @@ An Android app that opens Jupyter notebooks (`.ipynb`), runs them **on the phone
 
 - **Projects.** On first launch the app asks you to create a project or bring one from GitHub. A project is a folder (in the app's private storage) with notebooks, Markdown notes, data files and subfolders. Notebooks in a project run inside their own folder, so `pd.read_csv("data/x.csv")` works with the repo's layout.
 - **From GitHub, with Pull.** Paste `owner/repo` or a github.com link (`/tree/<branch>` picks a branch). The app downloads the files, and **Pull** later fetches only what changed. Your local edits are kept. If a file changed both on the phone and on GitHub, the phone's version stays and GitHub's is saved next to it as `name (GitHub).ext`. "Reset to GitHub" throws local changes away. Private repos need a token (a fine-grained token with read access to Contents). There is no push: it uses GitHub's REST API, not git.
-- Markdown files (`.md`) are rendered, and can be edited and saved.
+- Markdown files (`.md`) are rendered, and can be edited and saved. Tables written in HTML (`<table>`, common in READMEs) are shown as tables too, with their links. Other raw HTML (`<picture>`, `<details>`…) is skipped.
 - Links between files work like on GitHub: `[lab](../lab.ipynb)`, `[notes](docs/notes.md)` or `/docs/` (from the project root) open that notebook, note or folder, in `.md` files, text cells and Markdown outputs. Web links open in the browser. Links to a heading (`#section`) aren't supported yet.
 - Inside a project file, the ☰ button next to the back arrow shows the project's files in a side panel, with folders you can expand and collapse, so you can jump to another notebook or note.
 - Open notebooks with the system file picker (local storage, Google Drive, …), with "Open with" or "Share" from other apps, or from the recent files list.
@@ -56,6 +56,7 @@ Packages are installed at build time, not at runtime: `!pip install` inside a no
 | nbformat v4 parsing and writing, output merging | `notebook/Notebook.kt` |
 | State, file I/O, run queue | `ui/NotebookViewModel.kt` |
 | Projects: list, folders, Markdown files | `data/Projects.kt`, `ui/ProjectsViewModel.kt` |
+| HTML tables in Markdown, as pipe tables | `data/HtmlTables.kt`, `ui/MarkdownText.kt` |
 | GitHub pull: API client, three-way plan (GitHub / last pull / disk), applying it | `sync/GitHub.kt`, `sync/Sync.kt`, `sync/Puller.kt` |
 | Compose UI | `ui/HomeScreen.kt`, `ui/ProjectScreen.kt`, `ui/MarkdownScreen.kt`, `ui/NotebookScreen.kt`, `ui/OutputViews.kt` |
 

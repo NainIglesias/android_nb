@@ -37,7 +37,6 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
-import com.mikepenz.markdown.m3.Markdown
 import io.github.nainiglesias.nb.notebook.Ansi
 import io.github.nainiglesias.nb.notebook.Outputs.str
 import io.github.nainiglesias.nb.notebook.asStringList
@@ -74,7 +73,7 @@ private fun RichOutput(data: JsonObject) {
         // JavaScript is disabled, so script-driven HTML (plotly, widgets) would be blank.
         html != null && !(plain != null && html.contains("<script", ignoreCase = true)) -> HtmlOutput(html)
         s("image/svg+xml") != null -> HtmlOutput(s("image/svg+xml")!!)
-        s("text/markdown") != null -> Markdown(s("text/markdown")!!, modifier = Modifier.fillMaxWidth())
+        s("text/markdown") != null -> MarkdownText(s("text/markdown")!!)
         s("text/latex") != null -> TextOutput(s("text/latex")!!)
         data["application/json"] != null ->
             TextOutput(PrettyJson.encodeToString(data["application/json"]!!))
